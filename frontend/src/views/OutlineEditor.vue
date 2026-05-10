@@ -230,7 +230,50 @@ const handleStartWriting = async () => {
 const loadOutline = async () => {
   try {
     const res = await getOutline(novelId)
-    if (res) outline.value = res
+    if (!res) return
+
+    // API 返回 { novel_id, outlines: [{level, content, ...}] }
+    // 需要从中提取并转换为 { volumes: [...] } 格式
+    const outlines = res.outlines || res
+    if (Array.isArray(outlines)) {
+      // 找到 master 层级的总纲
+      const master = outlines.find(o => o.level === 'master')
+      if (master && master.content) {
+        let parsed = master.content
+        // content 可能是 JSON 字符串
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed)
+          } catch {}
+        }
+        if (parsed && parsed.volumes) {
+          outline.value = parsed
+          return
+        }
+      }
+      // 尝试从 volume 层级组装
+      const volumeOutlines = outlines.filter(o => o.level === 'volume')
+      if (volumeOutlines.length > 0) {
+        const volumes = volumeOutlines.map(vo => {
+          let content = vo.content
+          if (typeof content === 'string') {
+            try { content = JSON.parse(content) } catch {}
+          }
+          return {
+            title: vo.title || `第${vo.volume_number}卷`,
+            summary: content?.volume_title || '',
+            chapters: (content?.chapter_outlines || []).map(ch => ({
+              title: ch.title || `第${ch.chapter_number}章`,
+              summary: ch.summary || '',
+            }))
+          }
+        })
+        outline.value = { volumes }
+        return
+      }
+    }
+    // fallback: 直接赋值
+    outline.value = res
   } catch {}
 }
 
