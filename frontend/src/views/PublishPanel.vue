@@ -4,45 +4,33 @@
       <h2>🚀 发布管理</h2>
     </div>
 
-    <el-row :gutter="24">
-      <!-- 左侧：发布控制 -->
-      <el-col :xs="24" :lg="10">
-        <el-card class="section-card">
-          <template #header>
-            <span>番茄小说发布</span>
-          </template>
+    <div class="publish-layout">
+      <!-- 发布控制 -->
+      <div class="publish-left">
+        <div class="section-card">
+          <div class="section-title">番茄小说发布</div>
 
-          <!-- 登录状态 -->
           <div class="login-status">
             <div class="status-indicator" :class="{ active: isLoggedIn }"></div>
-            <span>{{ isLoggedIn ? '已登录番茄小说' : '未登录番茄小说' }}</span>
+            <span>{{ isLoggedIn ? '已登录' : '未登录' }}</span>
             <el-button size="small" @click="checkLoginStatus">
               <el-icon><Refresh /></el-icon>
-              检查状态
             </el-button>
           </div>
 
-          <el-divider />
+          <div class="divider"></div>
 
-          <!-- 待发布章节 -->
-          <h3 class="section-title">待发布章节</h3>
+          <div class="sub-title">待发布章节</div>
           <div v-if="pendingChapters.length === 0" class="empty-hint">
             所有章节已发布，或暂无章节
           </div>
           <div v-else class="pending-list">
-            <div
-              v-for="ch in pendingChapters"
-              :key="ch.id"
-              class="pending-item"
-            >
+            <div v-for="ch in pendingChapters" :key="ch.id" class="pending-item">
               <span class="item-title">{{ ch.title }}</span>
               <span class="item-words">{{ ch.word_count || ch.wordCount || 0 }}字</span>
             </div>
           </div>
 
-          <el-divider />
-
-          <!-- 发布按钮 -->
           <el-button
             type="primary"
             size="large"
@@ -53,49 +41,39 @@
           >
             {{ publishing ? '发布中...' : '一键发布到番茄小说' }}
           </el-button>
-        </el-card>
-      </el-col>
+        </div>
+      </div>
 
-      <!-- 右侧：发布进度 -->
-      <el-col :xs="24" :lg="14">
-        <el-card class="section-card">
-          <template #header>
-            <span>发布状态与历史</span>
-          </template>
+      <!-- 发布进度 -->
+      <div class="publish-right">
+        <div class="section-card">
+          <div class="section-title">发布状态与历史</div>
 
-          <!-- 发布进度 -->
           <div v-if="publishing" class="publish-progress">
-            <el-progress
-              :percentage="publishProgress"
-              :stroke-width="16"
-              :color="progressColors"
-            />
+            <el-progress :percentage="publishProgress" :stroke-width="10" :color="progressColors" />
             <p class="progress-text">{{ progressMessage }}</p>
           </div>
 
-          <!-- 发布历史 -->
-          <div v-if="publishHistory.length > 0">
-            <h3 class="section-title">发布记录</h3>
-            <el-timeline>
-              <el-timeline-item
-                v-for="(record, idx) in publishHistory"
-                :key="idx"
-                :type="record.success ? 'success' : 'danger'"
-                :timestamp="record.time"
-                placement="top"
-              >
-                <el-card class="timeline-card" shadow="never">
-                  <p>{{ record.message }}</p>
-                  <p v-if="record.detail" class="record-detail">{{ record.detail }}</p>
-                </el-card>
-              </el-timeline-item>
-            </el-timeline>
+          <div v-if="publishHistory.length > 0" class="history-list">
+            <div
+              v-for="(record, idx) in publishHistory"
+              :key="idx"
+              class="history-item"
+              :class="{ success: record.success, fail: !record.success }"
+            >
+              <div class="history-dot" :class="{ success: record.success }"></div>
+              <div class="history-content">
+                <div class="history-msg">{{ record.message }}</div>
+                <div v-if="record.detail" class="history-detail">{{ record.detail }}</div>
+                <div class="history-time">{{ record.time }}</div>
+              </div>
+            </div>
           </div>
 
           <el-empty v-if="!publishing && publishHistory.length === 0" description="暂无发布记录" />
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -122,7 +100,6 @@ const progressColors = [
   { color: '#3fb950', percentage: 100 }
 ]
 
-// 检查登录状态
 const checkLoginStatus = async () => {
   try {
     const status = await getPublishStatus(novelId)
@@ -135,28 +112,23 @@ const checkLoginStatus = async () => {
   }
 }
 
-// 加载待发布章节
 const loadChapters = async () => {
   try {
     const chapters = await getChapters(novelId)
-    // 筛选已完成但未发布的章节
     pendingChapters.value = chapters.filter(c =>
-      (c.status === 'completed' || c.status === 'done') &&
-      c.publish_status !== 'published'
+      (c.status === 'completed' || c.status === 'done') && c.publish_status !== 'published'
     )
   } catch {
     pendingChapters.value = []
   }
 }
 
-// 发布
 const handlePublish = async () => {
   publishing.value = true
   publishProgress.value = 0
   progressMessage.value = '准备发布...'
 
   try {
-    // 模拟进度
     const progressInterval = setInterval(() => {
       if (publishProgress.value < 90) {
         publishProgress.value += Math.random() * 15
@@ -171,7 +143,6 @@ const handlePublish = async () => {
     publishProgress.value = 100
     progressMessage.value = '发布完成！'
 
-    // 添加到历史
     publishHistory.value.unshift({
       success: true,
       message: `成功发布 ${pendingChapters.value.length} 个章节`,
@@ -180,7 +151,7 @@ const handlePublish = async () => {
     })
 
     ElMessage.success('发布成功！')
-    loadChapters() // 刷新列表
+    loadChapters()
   } catch (e) {
     publishHistory.value.unshift({
       success: false,
@@ -201,15 +172,38 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.publish-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .section-card {
   background: var(--bg-card);
-  border-color: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.sub-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
 }
 
 .login-status {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .status-indicator {
@@ -224,76 +218,130 @@ onMounted(() => {
   box-shadow: 0 0 6px var(--success);
 }
 
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
 }
 
 .empty-hint {
   font-size: 13px;
   color: var(--text-muted);
   text-align: center;
-  padding: 20px 0;
+  padding: 16px 0;
 }
 
 .pending-list {
-  max-height: 300px;
+  max-height: 200px;
   overflow-y: auto;
+  margin-bottom: 12px;
 }
 
 .pending-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 4px;
-  margin-bottom: 4px;
+  font-size: 13px;
 }
 
-.pending-item:hover {
+.pending-item:active {
   background: var(--bg-hover);
 }
 
 .item-title {
-  font-size: 14px;
   color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-words {
   font-size: 12px;
   color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .publish-btn {
   width: 100%;
-  margin-top: 12px;
 }
 
 .publish-progress {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .progress-text {
   text-align: center;
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--text-secondary);
   font-size: 13px;
 }
 
-.timeline-card {
-  background: var(--bg-secondary) !important;
-  border-color: var(--border) !important;
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.timeline-card :deep(.el-card__body) {
+.history-item {
+  display: flex;
+  gap: 10px;
   padding: 10px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
 }
 
-.record-detail {
+.history-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.history-dot.success {
+  background: var(--success);
+}
+
+.history-msg {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.history-detail {
   font-size: 12px;
   color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.history-time {
+  font-size: 11px;
+  color: var(--text-muted);
   margin-top: 4px;
+}
+
+/* 桌面端 */
+@media (min-width: 769px) {
+  .publish-layout {
+    flex-direction: row;
+  }
+
+  .publish-left {
+    width: 40%;
+    flex-shrink: 0;
+  }
+
+  .publish-right {
+    flex: 1;
+  }
+
+  .pending-item:hover {
+    background: var(--bg-hover);
+  }
 }
 </style>

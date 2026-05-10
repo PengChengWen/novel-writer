@@ -2,22 +2,20 @@
   <div class="page-container">
     <div class="page-header">
       <h2>🔍 风格分析</h2>
-      <el-button @click="router.push('/')">返回仪表盘</el-button>
     </div>
 
-    <el-row :gutter="24">
+    <!-- 手机端：上下布局 / 桌面端：左右布局 -->
+    <div class="analyze-layout">
       <!-- 左侧：上传参考文本 -->
-      <el-col :xs="24" :lg="10">
-        <el-card class="section-card">
-          <template #header>
-            <span>📖 参考小说文本</span>
-          </template>
+      <div class="analyze-left">
+        <div class="section-card">
+          <div class="section-title">📖 参考小说文本</div>
 
           <el-input
             v-model="referenceText"
             type="textarea"
-            :rows="12"
-            placeholder="粘贴参考小说的文本内容，建议 5000 字以上以获得更准确的分析结果..."
+            :rows="8"
+            placeholder="粘贴参考小说的文本内容，建议 5000 字以上..."
             class="reference-input"
           />
 
@@ -28,9 +26,9 @@
               accept=".txt,.md"
               @change="handleFileUpload"
             >
-              <el-button>
+              <el-button size="small">
                 <el-icon><Upload /></el-icon>
-                上传 .txt 文件
+                上传 .txt
               </el-button>
             </el-upload>
             <span class="upload-hint">支持 .txt 格式</span>
@@ -47,31 +45,24 @@
             {{ analyzing ? '分析中...' : '开始风格分析' }}
           </el-button>
 
-          <!-- 分析进度 -->
           <div v-if="analyzing" class="progress-section">
-            <el-progress :percentage="analysisProgress" :stroke-width="10" />
+            <el-progress :percentage="analysisProgress" :stroke-width="8" />
             <p class="progress-text">{{ progressText }}</p>
           </div>
-        </el-card>
-      </el-col>
+        </div>
+      </div>
 
       <!-- 右侧：分析结果 -->
-      <el-col :xs="24" :lg="14">
-        <el-card class="section-card">
-          <template #header>
-            <span>📊 分析结果</span>
-          </template>
+      <div class="analyze-right">
+        <div class="section-card">
+          <div class="section-title">📊 分析结果</div>
 
-          <!-- 无结果状态 -->
           <el-empty v-if="!result" description="请先上传参考文本并开始分析" />
 
-          <!-- 分析结果 -->
           <div v-else>
-            <!-- 雷达图 -->
             <h3 class="result-title">文笔特征雷达图</h3>
             <StyleRadar :data="radarData" />
 
-            <!-- 爽点分布 -->
             <h3 class="result-title">爽点分布</h3>
             <div class="excitement-timeline">
               <div
@@ -88,7 +79,6 @@
               </div>
             </div>
 
-            <!-- 风格指南 -->
             <h3 class="result-title">风格指南</h3>
             <div class="style-guide">
               <div
@@ -101,20 +91,19 @@
               </div>
             </div>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { uploadReferenceText, analyzeStyle, getAnalysisResult, getStyleGuide } from '../api'
 import { ElMessage } from 'element-plus'
 import StyleRadar from '../components/StyleRadar.vue'
 
-const router = useRouter()
 const route = useRoute()
 const novelId = route.params.id
 
@@ -125,7 +114,6 @@ const progressText = ref('')
 const result = ref(null)
 const styleGuide = ref({})
 
-// 雷达图数据
 const radarData = computed(() => {
   if (!result.value) return {}
   return {
@@ -142,16 +130,12 @@ const radarData = computed(() => {
   }
 })
 
-// 读取上传文件
 const handleFileUpload = (file) => {
   const reader = new FileReader()
-  reader.onload = (e) => {
-    referenceText.value = e.target.result
-  }
+  reader.onload = (e) => { referenceText.value = e.target.result }
   reader.readAsText(file.raw)
 }
 
-// 开始分析
 const startAnalyze = async () => {
   if (!referenceText.value.trim()) {
     ElMessage.warning('请先输入或上传参考文本')
@@ -163,20 +147,16 @@ const startAnalyze = async () => {
   progressText.value = '正在上传文本...'
 
   try {
-    // 1. 上传文本
     analysisProgress.value = 20
     await uploadReferenceText(novelId, referenceText.value)
 
-    // 2. 触发分析
     progressText.value = '正在进行风格分析...'
     analysisProgress.value = 40
     await analyzeStyle(novelId)
 
-    // 3. 模拟进度（实际可能需要轮询）
     analysisProgress.value = 70
     progressText.value = '正在生成分析报告...'
 
-    // 4. 获取结果
     const [analysisRes, guideRes] = await Promise.all([
       getAnalysisResult(novelId),
       getStyleGuide(novelId)
@@ -194,7 +174,6 @@ const startAnalyze = async () => {
   }
 }
 
-// 加载已有结果
 const loadExistingResult = async () => {
   try {
     const [analysisRes, guideRes] = await Promise.all([
@@ -203,32 +182,45 @@ const loadExistingResult = async () => {
     ])
     if (analysisRes) result.value = analysisRes
     if (guideRes) styleGuide.value = guideRes
-  } catch {
-    // 没有已有结果，正常
-  }
+  } catch {}
 }
 
 onMounted(loadExistingResult)
 </script>
 
 <style scoped>
+.analyze-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .section-card {
   background: var(--bg-card);
-  border-color: var(--border);
-  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
 }
 
 .reference-input :deep(textarea) {
   background: var(--bg-secondary);
   color: var(--text-primary);
   border-color: var(--border);
+  font-size: 14px;
 }
 
 .upload-section {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 16px 0;
+  gap: 8px;
+  margin: 12px 0;
 }
 
 .upload-hint {
@@ -241,20 +233,20 @@ onMounted(loadExistingResult)
 }
 
 .progress-section {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .progress-text {
   font-size: 13px;
   color: var(--text-secondary);
-  margin-top: 8px;
+  margin-top: 6px;
   text-align: center;
 }
 
 .result-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  margin: 20px 0 12px;
+  margin: 16px 0 10px;
   color: var(--text-primary);
 }
 
@@ -279,7 +271,7 @@ onMounted(loadExistingResult)
 
 .excitement-point {
   position: relative;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding-left: 16px;
 }
 
@@ -308,13 +300,13 @@ onMounted(loadExistingResult)
 .point-desc {
   font-size: 13px;
   color: var(--text-secondary);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .style-guide {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .guide-item {
@@ -326,6 +318,26 @@ onMounted(loadExistingResult)
 .guide-text {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.5;
+}
+
+/* 桌面端左右布局 */
+@media (min-width: 769px) {
+  .analyze-layout {
+    flex-direction: row;
+  }
+
+  .analyze-left {
+    width: 40%;
+    flex-shrink: 0;
+  }
+
+  .analyze-right {
+    flex: 1;
+  }
+
+  .section-card {
+    height: 100%;
+  }
 }
 </style>

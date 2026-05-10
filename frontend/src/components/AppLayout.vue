@@ -1,9 +1,9 @@
 <template>
-  <el-container class="app-layout">
-    <!-- 左侧导航栏 -->
-    <el-aside :width="isCollapse ? '64px' : '220px'" class="sidebar">
+  <div class="app-layout">
+    <!-- 桌面端侧边栏 -->
+    <aside class="sidebar" :class="{ collapsed: isCollapse }">
       <div class="logo" @click="router.push('/')">
-        <el-icon :size="28"><EditPen /></el-icon>
+        <el-icon :size="24"><EditPen /></el-icon>
         <span v-show="!isCollapse" class="logo-text">AI 小说工坊</span>
       </div>
 
@@ -19,52 +19,33 @@
           <el-icon><Odometer /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
-
-        <el-menu-item
-          v-if="currentNovelId"
-          :index="`/novel/${currentNovelId}/style`"
-        >
+        <el-menu-item v-if="currentNovelId" :index="`/novel/${currentNovelId}/style`">
           <el-icon><DataAnalysis /></el-icon>
           <span>风格分析</span>
         </el-menu-item>
-
-        <el-menu-item
-          v-if="currentNovelId"
-          :index="`/novel/${currentNovelId}/outline`"
-        >
+        <el-menu-item v-if="currentNovelId" :index="`/novel/${currentNovelId}/outline`">
           <el-icon><List /></el-icon>
           <span>大纲编辑</span>
         </el-menu-item>
-
-        <el-menu-item
-          v-if="currentNovelId"
-          :index="`/novel/${currentNovelId}/chapters`"
-        >
+        <el-menu-item v-if="currentNovelId" :index="`/novel/${currentNovelId}/chapters`">
           <el-icon><Document /></el-icon>
           <span>章节管理</span>
         </el-menu-item>
-
-        <el-menu-item
-          v-if="currentNovelId"
-          :index="`/novel/${currentNovelId}/publish`"
-        >
+        <el-menu-item v-if="currentNovelId" :index="`/novel/${currentNovelId}/publish`">
           <el-icon><Upload /></el-icon>
           <span>发布管理</span>
         </el-menu-item>
       </el-menu>
 
       <div class="collapse-btn" @click="isCollapse = !isCollapse">
-        <el-icon>
-          <Fold v-if="!isCollapse" />
-          <Expand v-else />
-        </el-icon>
+        <el-icon><Fold v-if="!isCollapse" /><Expand v-else /></el-icon>
       </div>
-    </el-aside>
+    </aside>
 
-    <!-- 右侧内容区 -->
-    <el-container>
-      <!-- 顶部栏 -->
-      <el-header class="topbar">
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+      <!-- 顶部栏（手机端显示） -->
+      <header class="topbar">
         <div class="topbar-left">
           <el-select
             v-if="novels.length > 0"
@@ -81,25 +62,74 @@
               :value="novel.id"
             />
           </el-select>
+          <span v-else class="topbar-title">AI 小说工坊</span>
         </div>
         <div class="topbar-right">
-          <el-button type="primary" @click="router.push('/novel/create')">
+          <el-button type="primary" size="small" @click="router.push('/novel/create')">
             <el-icon><Plus /></el-icon>
-            <span>新建小说</span>
+            <span class="btn-text">新建</span>
           </el-button>
         </div>
-      </el-header>
+      </header>
 
       <!-- 主内容 -->
-      <el-main class="main-content">
+      <main class="main-content">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
             <component :is="Component" />
           </transition>
         </router-view>
-      </el-main>
-    </el-container>
-  </el-container>
+      </main>
+    </div>
+
+    <!-- 手机端底部导航栏 -->
+    <nav class="bottom-nav">
+      <div
+        class="nav-item"
+        :class="{ active: activeMenu === '/' }"
+        @click="router.push('/')"
+      >
+        <el-icon :size="20"><Odometer /></el-icon>
+        <span>仪表盘</span>
+      </div>
+      <div
+        v-if="currentNovelId"
+        class="nav-item"
+        :class="{ active: activeMenu.includes('/style') }"
+        @click="router.push(`/novel/${currentNovelId}/style`)"
+      >
+        <el-icon :size="20"><DataAnalysis /></el-icon>
+        <span>风格</span>
+      </div>
+      <div
+        v-if="currentNovelId"
+        class="nav-item"
+        :class="{ active: activeMenu.includes('/outline') }"
+        @click="router.push(`/novel/${currentNovelId}/outline`)"
+      >
+        <el-icon :size="20"><List /></el-icon>
+        <span>大纲</span>
+      </div>
+      <div
+        v-if="currentNovelId"
+        class="nav-item"
+        :class="{ active: activeMenu.includes('/chapters') }"
+        @click="router.push(`/novel/${currentNovelId}/chapters`)"
+      >
+        <el-icon :size="20"><Document /></el-icon>
+        <span>章节</span>
+      </div>
+      <div
+        v-if="currentNovelId"
+        class="nav-item"
+        :class="{ active: activeMenu.includes('/publish') }"
+        @click="router.push(`/novel/${currentNovelId}/publish`)"
+      >
+        <el-icon :size="20"><Upload /></el-icon>
+        <span>发布</span>
+      </div>
+    </nav>
+  </div>
 </template>
 
 <script setup>
@@ -114,14 +144,11 @@ const isCollapse = ref(false)
 const novels = ref([])
 const currentNovelId = ref(localStorage.getItem('currentNovelId') || '')
 
-// 当前激活的菜单
 const activeMenu = computed(() => route.path)
 
-// 加载小说列表
 const loadNovels = async () => {
   try {
     novels.value = await getNovels()
-    // 如果没有选中的小说且有小说列表，默认选中第一个
     if (!currentNovelId.value && novels.value.length > 0) {
       currentNovelId.value = novels.value[0].id
       localStorage.setItem('currentNovelId', currentNovelId.value)
@@ -131,42 +158,42 @@ const loadNovels = async () => {
   }
 }
 
-// 切换当前小说
 const onNovelChange = (id) => {
   if (id) {
     localStorage.setItem('currentNovelId', id)
   } else {
     localStorage.removeItem('currentNovelId')
   }
-  // 如果当前在小说详情页，跳转到仪表盘
-  if (route.params.id && route.params.id !== id) {
+  if (route.params.id && route.params.id !== String(id)) {
     router.push('/')
   }
 }
 
-// 监听路由变化，刷新小说列表（创建新小说后需要更新）
-watch(() => route.path, () => {
-  loadNovels()
-})
-
-onMounted(() => {
-  loadNovels()
-})
+watch(() => route.path, () => loadNovels())
+onMounted(() => loadNovels())
 </script>
 
 <style scoped>
 .app-layout {
   height: 100vh;
+  height: 100dvh;
+  display: flex;
   overflow: hidden;
 }
 
+/* ===== 桌面端侧边栏 ===== */
 .sidebar {
+  width: 220px;
   background: #161b22;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
-  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed {
+  width: 64px;
 }
 
 .logo {
@@ -180,12 +207,12 @@ onMounted(() => {
 }
 
 .logo-text {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.el-menu {
+.sidebar .el-menu {
   flex: 1;
   border-right: none;
   overflow-y: auto;
@@ -203,48 +230,125 @@ onMounted(() => {
   color: var(--accent);
 }
 
+/* ===== 主内容区 ===== */
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
 .topbar {
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  height: 56px;
+  padding: 0 16px;
+  height: 48px;
+  flex-shrink: 0;
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .novel-selector {
-  width: 240px;
+  width: 200px;
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .main-content {
-  background: var(--bg-primary);
+  flex: 1;
   overflow-y: auto;
-  padding: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* 移动端适配 */
+/* ===== 底部导航栏（手机端） ===== */
+.bottom-nav {
+  display: none;
+}
+
+/* ===== 手机端适配 ===== */
 @media (max-width: 768px) {
   .sidebar {
-    position: fixed;
-    z-index: 100;
-    height: 100vh;
+    display: none;
+  }
+
+  .topbar {
+    padding: 0 12px;
+    height: 44px;
   }
 
   .novel-selector {
-    width: 160px;
+    width: 140px;
+  }
+
+  .btn-text {
+    display: none;
+  }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #161b22;
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+    gap: 2px;
+    color: var(--text-muted);
+    font-size: 10px;
+    cursor: pointer;
+    transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .nav-item.active {
+    color: var(--accent);
+  }
+
+  .nav-item:active {
+    opacity: 0.7;
+  }
+
+  .main-content {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ===== 小屏手机 ===== */
+@media (max-width: 375px) {
+  .novel-selector {
+    width: 120px;
   }
 }
 </style>

@@ -3,11 +3,11 @@
     <div class="page-header">
       <h2>📝 章节管理</h2>
       <div class="header-actions">
-        <el-button :loading="writingStatus === 'writing'" type="primary" @click="handleContinueWriting">
+        <el-button :loading="writingStatus === 'writing'" type="primary" size="small" @click="handleContinueWriting">
           <el-icon><VideoPlay /></el-icon>
           {{ writingStatus === 'writing' ? '写作中...' : '继续写作' }}
         </el-button>
-        <el-button @click="refreshChapters">
+        <el-button size="small" @click="refreshChapters">
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
@@ -15,98 +15,59 @@
     </div>
 
     <!-- 写作进度总览 -->
-    <el-card class="progress-overview" v-if="chapters.length > 0">
-      <el-row :gutter="20" align="middle">
-        <el-col :span="6">
-          <div class="overview-stat">
-            <span class="stat-value">{{ chapters.length }}</span>
-            <span class="stat-label">总章节</span>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="overview-stat">
-            <span class="stat-value">{{ completedChapters }}</span>
-            <span class="stat-label">已完成</span>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="overview-stat">
-            <span class="stat-value">{{ totalWords }}</span>
-            <span class="stat-label">总字数</span>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="overview-stat">
-            <span class="stat-value">{{ avgScore }}</span>
-            <span class="stat-label">平均质量</span>
-          </div>
-        </el-col>
-      </el-row>
+    <div class="progress-overview" v-if="chapters.length > 0">
+      <div class="overview-grid">
+        <div class="overview-stat">
+          <span class="stat-value">{{ chapters.length }}</span>
+          <span class="stat-label">总章节</span>
+        </div>
+        <div class="overview-stat">
+          <span class="stat-value">{{ completedChapters }}</span>
+          <span class="stat-label">已完成</span>
+        </div>
+        <div class="overview-stat">
+          <span class="stat-value">{{ totalWords }}</span>
+          <span class="stat-label">总字数</span>
+        </div>
+        <div class="overview-stat">
+          <span class="stat-value">{{ avgScore }}</span>
+          <span class="stat-label">平均质量</span>
+        </div>
+      </div>
       <el-progress
         :percentage="completionRate"
-        :stroke-width="12"
+        :stroke-width="8"
         :color="progressColors"
         class="overview-progress"
       />
-    </el-card>
+    </div>
 
     <!-- 章节列表 -->
-    <el-card class="section-card">
-      <el-table
-        :data="chapters"
-        style="width: 100%"
-        row-key="id"
-        v-loading="loading"
-        empty-text="暂无章节"
-        @row-click="goToChapter"
+    <div v-loading="loading" class="chapter-list">
+      <el-empty v-if="chapters.length === 0 && !loading" description="暂无章节" />
+
+      <div
+        v-for="ch in chapters"
+        :key="ch.id"
+        class="chapter-card"
+        @click="goToChapter(ch)"
       >
-        <el-table-column prop="number" label="章节" width="80" align="center">
-          <template #default="{ row }">
-            <span class="chapter-num">{{ row.number || row.chapter_number || '-' }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="title" label="标题" min-width="200">
-          <template #default="{ row }">
-            <span class="chapter-title">{{ row.title }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="word_count" label="字数" width="100" align="center">
-          <template #default="{ row }">
-            {{ formatWords(row.word_count || row.wordCount || 0) }}
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="quality_score" label="质量评分" width="120" align="center">
-          <template #default="{ row }">
-            <el-rate
-              :model-value="(row.quality_score || row.qualityScore || 0) / 20"
-              disabled
-              show-score
-              text-color="#d29922"
-              :score-template="(row.quality_score || row.qualityScore || 0).toString()"
-            />
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="status" label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getChapterStatusType(row.status)" size="small">
-              {{ getChapterStatusLabel(row.status) }}
+        <div class="chapter-main">
+          <div class="chapter-row">
+            <span class="chapter-num">第{{ ch.number || ch.chapter_number || '?' }}章</span>
+            <span class="chapter-title">{{ ch.title }}</span>
+          </div>
+          <div class="chapter-meta">
+            <span class="meta-text">{{ formatWords(ch.word_count || ch.wordCount || 0) }}字</span>
+            <span class="meta-score">⭐ {{ ch.quality_score || ch.qualityScore || '-' }}</span>
+            <el-tag :type="getChapterStatusType(ch.status)" size="small">
+              {{ getChapterStatusLabel(ch.status) }}
             </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="100" align="center">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" text @click.stop="goToChapter(row)">
-              阅读
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+          </div>
+        </div>
+        <el-icon class="chapter-arrow"><ArrowRight /></el-icon>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -124,13 +85,11 @@ const chapters = ref([])
 const loading = ref(false)
 const writingStatus = ref('idle')
 
-// 格式化字数
 const formatWords = (num) => {
   if (num >= 10000) return (num / 10000).toFixed(1) + '万'
   return num.toString()
 }
 
-// 统计
 const completedChapters = computed(() =>
   chapters.value.filter(c => c.status === 'completed' || c.status === 'done').length
 )
@@ -159,7 +118,6 @@ const progressColors = [
   { color: '#3fb950', percentage: 100 }
 ]
 
-// 章节状态
 const statusMap = {
   pending: { label: '待写作', type: 'info' },
   writing: { label: '写作中', type: 'warning' },
@@ -171,12 +129,10 @@ const statusMap = {
 const getChapterStatusLabel = (s) => statusMap[s]?.label || s || '未知'
 const getChapterStatusType = (s) => statusMap[s]?.type || 'info'
 
-// 跳转到章节阅读
 const goToChapter = (row) => {
   router.push(`/novel/${novelId}/chapter/${row.id}`)
 }
 
-// 刷新章节列表
 const refreshChapters = async () => {
   loading.value = true
   try {
@@ -188,13 +144,11 @@ const refreshChapters = async () => {
   }
 }
 
-// 继续写作
 const handleContinueWriting = async () => {
   try {
     await startWriting(novelId)
     writingStatus.value = 'writing'
     ElMessage.success('写作任务已启动，稍后刷新查看进度')
-    // 轮询状态
     const poll = setInterval(async () => {
       try {
         const status = await getWritingStatus(novelId)
@@ -218,67 +172,126 @@ onMounted(refreshChapters)
 
 <style scoped>
 .progress-overview {
-  margin-bottom: 20px;
   background: var(--bg-card);
-  border-color: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
-.overview-stat {
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
   text-align: center;
 }
 
 .stat-value {
   display: block;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--accent);
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .overview-progress {
-  margin-top: 16px;
-}
-
-.section-card {
-  background: var(--bg-card);
-  border-color: var(--border);
-}
-
-.chapter-num {
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.chapter-title {
-  cursor: pointer;
-  color: var(--text-primary);
-}
-
-.chapter-title:hover {
-  color: var(--accent);
+  margin-top: 12px;
 }
 
 .header-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* 表格深色适配 */
-.section-card :deep(.el-table) {
-  --el-table-bg-color: var(--bg-card);
-  --el-table-tr-bg-color: var(--bg-card);
-  --el-table-header-bg-color: var(--bg-secondary);
-  --el-table-row-hover-bg-color: var(--bg-hover);
-  --el-table-text-color: var(--text-primary);
-  --el-table-header-text-color: var(--text-secondary);
-  --el-table-border-color: var(--border);
+.chapter-list {
+  min-height: 200px;
 }
 
-.section-card :deep(.el-table__empty-text) {
+.chapter-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chapter-card:active {
+  transform: scale(0.98);
+  border-color: var(--accent);
+}
+
+.chapter-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.chapter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.chapter-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.chapter-title {
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chapter-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
   color: var(--text-muted);
+}
+
+.meta-text, .meta-score {
+  flex-shrink: 0;
+}
+
+.chapter-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* 桌面端 hover */
+@media (min-width: 769px) {
+  .chapter-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow);
+  }
+
+  .chapter-card:active {
+    transform: none;
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+  }
 }
 </style>
