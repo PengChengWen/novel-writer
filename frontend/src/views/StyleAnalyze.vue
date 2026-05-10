@@ -64,32 +64,31 @@
             <StyleRadar :data="radarData" />
 
             <h3 class="result-title">爽点分布</h3>
-            <div class="excitement-timeline">
+            <div v-if="excitementPoints.length > 0" class="excitement-timeline">
               <div
-                v-for="(point, idx) in result.excitementPoints || []"
+                v-for="(point, idx) in excitementPoints"
                 :key="idx"
                 class="excitement-point"
               >
                 <div class="point-marker"></div>
                 <div class="point-content">
                   <span class="point-position">{{ point.position }}%</span>
-                  <span class="point-type">{{ point.type }}</span>
+                  <el-tag size="small" type="warning">{{ point.type }}</el-tag>
+                  <span v-if="point.intensity" class="point-intensity">强度 {{ point.intensity }}/10</span>
                   <p class="point-desc">{{ point.description }}</p>
                 </div>
               </div>
             </div>
+            <el-empty v-else description="暂无爽点数据" :image-size="60" />
 
             <h3 class="result-title">风格指南</h3>
-            <div class="style-guide">
-              <div
-                v-for="(item, idx) in styleGuide.items || []"
-                :key="idx"
-                class="guide-item"
-              >
-                <el-tag :type="item.tagType || ''" size="small">{{ item.category }}</el-tag>
-                <span class="guide-text">{{ item.content }}</span>
+            <div v-if="guideText" class="style-guide-text">
+              <div v-for="(section, idx) in guideSections" :key="idx" class="guide-section">
+                <h4 class="guide-section-title">{{ section.title }}</h4>
+                <div class="guide-section-content" v-html="section.content"></div>
               </div>
             </div>
+            <el-empty v-else description="暂无风格指南" :image-size="60" />
           </div>
         </div>
       </div>
@@ -114,19 +113,70 @@ const progressText = ref('')
 const result = ref(null)
 const styleGuide = ref({})
 
+// 爽点数据（从 profile.hook_analysis 提取）
+const excitementPoints = computed(() => {
+  if (!result.value) return []
+  const profile = result.value.profile || {}
+  const hooks = profile.hook_analysis || []
+  if (Array.isArray(hooks)) {
+    return hooks.map(h => ({
+      position: h.position || 0,
+      type: h.type || '未知',
+      description: h.description || '',
+      intensity: h.intensity || 0,
+    }))
+  }
+  return []
+})
+
+// 风格指南文本
+const guideText = computed(() => {
+  return styleGuide.value?.style_guide || result.value?.style_guide || ''
+})
+
+// 将风格指南 Markdown 拆分为段落
+const guideSections = computed(() => {
+  const text = guideText.value
+  if (!text) return []
+  const sections = []
+  const parts = text.split(/#{2,3}\s+/).filter(Boolean)
+  const titles = text.match(/#{2,3}\s+.+/g) || []
+  for (let i = 0; i < parts.length; i++) {
+    const title = titles[i]?.replace(/^#+\s+/, '') || `段落${i + 1}`
+    const content = parts[i].trim().replace(/\n/g, '<br>')
+    sections.push({ title, content })
+  }
+  return sections
+})
+
 const radarData = computed(() => {
   if (!result.value) return {}
+  const profile = result.value.profile || {}
+  const sa = profile.sentence_analysis || {}
+  const ta = profile.tone_analysis || {}
+  // 从分析结果构造雷达图数据
+  const shortRatio = parseFloat(sa.short_sentence_ratio) || 35
+  const mediumRatio = parseFloat(sa.medium_sentence_ratio) || 45
+  const dialogueRatio = parseFloat((result.value.profile?.dialogue_analysis?.dialogue_char_ratio || '0').replace('%', '')) || 10
   return {
-    indicators: result.value.indicators || [
-      { name: '文笔优美度', max: 100 },
-      { name: '情节紧凑度', max: 100 },
-      { name: '人物塑造', max: 100 },
-      { name: '对话质量', max: 100 },
-      { name: '世界观设定', max: 100 },
-      { name: '节奏把控', max: 100 },
+    indicators: [
+      { name: '短句风格', max: 100 },
+      { name: '中句风格', max: 100 },
+      { name: '对话密度', max: 100 },
+      { name: '语气基调', max: 100 },
+      { name: '词汇丰富度', max: 100 },
+      { name: '节奏感', max: 100 },
       { name: '爽点密度', max: 100 }
     ],
-    values: result.value.values || [60, 70, 65, 55, 50, 72, 68]
+    values: [
+      shortRatio,
+      mediumRatio,
+      Math.min(dialogueRatio * 2, 100),
+      ta.tone_variety ? ta.tone_variety * 30 : 60,
+      (profile.vocabulary_analysis?.vocabulary_richness || 50),
+      70,
+      excitementPoints.value.length * 15
+    ]
   }
 })
 
@@ -176,12 +226,14 @@ const startAnalyze = async () => {
 
 const loadExistingResult = async () => {
   try {
-    const [analysisRes, guideRes] = await Promise.all([
-      getAnalysisResult(novelId),
-      getStyleGuide(novelId)
-    ])
-    if (analysisRes) result.value = analysisRes
-    if (guideRes) styleGuide.value = guideRes
+    const analysisRes = await getAnalysisResult(novelId)
+    if (analysisRes) {
+      result.value = analysisRes
+      // 风格指南在分析结果中
+      if (analysisRes.style_guide) {
+        styleGuide.value = { style_guide: analysisRes.style_guide }
+      }
+    }
   } catch {}
 }
 
@@ -319,6 +371,44 @@ onMounted(loadExistingResult)
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.point-intensity {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.style-guide-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.guide-section {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.guide-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.guide-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.guide-section-content {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 
 /* 桌面端左右布局 */
