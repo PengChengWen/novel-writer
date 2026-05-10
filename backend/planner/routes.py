@@ -2,6 +2,7 @@
 大纲引擎 API 路由
 """
 
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -84,7 +85,7 @@ async def generate_master_outline(req: GenerateMasterRequest, db: Session = Depe
         novel_id=novel.id,
         level="master",
         title=f"{novel.title} - 总纲",
-        content=result,
+        content=json.dumps(result, ensure_ascii=False),
         key_events=result.get("volumes", []),
         word_target=novel.target_words,
     )
@@ -127,7 +128,7 @@ async def generate_volume_outline(req: GenerateVolumeRequest, db: Session = Depe
         level="volume",
         volume_number=req.volume_number,
         title=result.get("volume_title", f"第{req.volume_number}卷"),
-        content=result,
+        content=json.dumps(result, ensure_ascii=False),
         word_target=sum(
             ch.get("word_target", 3000)
             for ch in result.get("chapter_outlines", [])

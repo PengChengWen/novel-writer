@@ -13,6 +13,37 @@ from backend.planner.templates import get_genre_template
 client = OpenAI(api_key=config.MI_API_KEY, base_url=config.MI_BASE_URL)
 
 
+def _parse_json_response(text: str) -> dict:
+    """解析 AI 返回的 JSON，处理 markdown 代码块包裹等常见情况"""
+    # 去除 markdown 代码块包裹
+    cleaned = re.sub(r'```(?:json)?\s*', '', text)
+    cleaned = re.sub(r'```\s*$', '', cleaned.strip())
+    cleaned = cleaned.strip()
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 尝试用正则找 JSON 对象
+    json_match = re.search(r"\{[\s\S]*\}", cleaned)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError:
+            # 尝试截断修复（AI 输出可能被截断）
+            raw = json_match.group()
+            # 尝试逐层剥闭合括号
+            for i in range(len(raw) - 1, 0, -1):
+                if raw[i] == '}':
+                    try:
+                        return json.loads(raw[:i + 1])
+                    except json.JSONDecodeError:
+                        continue
+
+    return {"error": "JSON 解析失败", "raw": text[:2000]}
+
+
 def generate_master_outline(
     genre: str,
     title: str,
@@ -104,13 +135,7 @@ def generate_master_outline(
     )
 
     result_text = response.choices[0].message.content.strip()
-    try:
-        json_match = re.search(r"\{[\s\S]*\}", result_text)
-        if json_match:
-            return json.loads(json_match.group())
-        return json.loads(result_text)
-    except json.JSONDecodeError:
-        return {"error": "JSON 解析失败", "raw": result_text}
+    return _parse_json_response(result_text)
 
 
 def generate_volume_outline(
@@ -197,10 +222,4 @@ def generate_volume_outline(
     )
 
     result_text = response.choices[0].message.content.strip()
-    try:
-        json_match = re.search(r"\{[\s\S]*\}", result_text)
-        if json_match:
-            return json.loads(json_match.group())
-        return json.loads(result_text)
-    except json.JSONDecodeError:
-        return {"error": "JSON 解析失败", "raw": result_text}
+    return _parse_json_response(result_text)
