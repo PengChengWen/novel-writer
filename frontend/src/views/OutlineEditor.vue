@@ -14,96 +14,111 @@
       </div>
     </div>
 
-    <!-- 手机端：Tab 切换 / 桌面端：左右布局 -->
-    <div class="outline-layout">
-      <!-- 大纲树 -->
-      <div class="outline-left">
-        <div class="section-card">
-          <div class="section-header">
-            <span class="section-title">大纲结构</span>
-            <el-button size="small" @click="addNode(null)">
-              <el-icon><Plus /></el-icon>添加卷
-            </el-button>
-          </div>
+    <el-empty v-if="!outline" description="暂无大纲">
+      <el-button type="primary" :loading="generating" @click="handleGenerate">
+        生成大纲
+      </el-button>
+    </el-empty>
 
-          <div v-if="outline" class="tree-container">
-            <div v-for="(vol, vi) in treeData" :key="vol.id" class="tree-volume">
-              <div
-                class="tree-node volume-node"
-                :class="{ active: selectedNode?.id === vol.id }"
-                @click="selectNode(vol)"
-              >
-                <span class="node-label">{{ vol.label }}</span>
-                <span class="node-actions">
-                  <el-button size="small" text @click.stop="addNode(vol)">
-                    <el-icon><Plus /></el-icon>
-                  </el-button>
-                  <el-button size="small" text type="danger" @click.stop="removeNode(vol)">
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </span>
-              </div>
-              <div class="tree-children">
-                <div
-                  v-for="ch in vol.children"
-                  :key="ch.id"
-                  class="tree-node chapter-node"
-                  :class="{ active: selectedNode?.id === ch.id }"
-                  @click="selectNode(ch)"
-                >
-                  <span class="node-label">{{ ch.label }}</span>
-                  <el-button size="small" text type="danger" @click.stop="removeNode(ch)">
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </div>
-              </div>
+    <template v-else>
+      <!-- 总纲概览卡片 -->
+      <div class="overview-grid">
+        <div class="overview-card" v-if="outline.core_concept">
+          <div class="card-label">💡 核心概念</div>
+          <div class="card-value">{{ outline.core_concept }}</div>
+        </div>
+        <div class="overview-card" v-if="outline.ending_type">
+          <div class="card-label">🎯 结局类型</div>
+          <div class="card-value"><el-tag>{{ outline.ending_type }}</el-tag></div>
+        </div>
+        <div class="overview-card" v-if="outline.main_conflict">
+          <div class="card-label">⚔️ 核心矛盾</div>
+          <div class="card-value">{{ outline.main_conflict }}</div>
+        </div>
+      </div>
+
+      <!-- 主角信息 -->
+      <div class="section-card" v-if="outline.main_character">
+        <div class="section-title">👤 主角设定</div>
+        <div class="character-grid">
+          <div class="char-item" v-if="outline.main_character.name">
+            <span class="char-label">姓名</span>
+            <span class="char-value">{{ outline.main_character.name }}</span>
+          </div>
+          <div class="char-item" v-if="outline.main_character.background">
+            <span class="char-label">背景</span>
+            <span class="char-value">{{ outline.main_character.background }}</span>
+          </div>
+          <div class="char-item" v-if="outline.main_character.ability">
+            <span class="char-label">能力</span>
+            <span class="char-value">{{ outline.main_character.ability }}</span>
+          </div>
+          <div class="char-item" v-if="outline.main_character.personality">
+            <span class="char-label">性格</span>
+            <span class="char-value">{{ outline.main_character.personality }}</span>
+          </div>
+          <div class="char-item" v-if="outline.main_character.goal">
+            <span class="char-label">目标</span>
+            <span class="char-value">{{ outline.main_character.goal }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 世界观 & 力量体系 -->
+      <div class="two-col">
+        <div class="section-card" v-if="outline.world_setting">
+          <div class="section-title">🌍 世界观设定</div>
+          <div class="section-text">{{ outline.world_setting }}</div>
+        </div>
+        <div class="section-card" v-if="outline.power_system">
+          <div class="section-title">⚡ 力量体系</div>
+          <div class="section-text">{{ outline.power_system }}</div>
+        </div>
+      </div>
+
+      <!-- 卖点执行 -->
+      <div class="section-card" v-if="outline.selling_points_execution">
+        <div class="section-title">🔥 卖点执行方案</div>
+        <div class="section-text" v-html="formatText(outline.selling_points_execution)"></div>
+      </div>
+
+      <!-- 卷章结构 -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">📚 卷章结构（{{ outline.volumes?.length || 0 }} 卷）</span>
+        </div>
+
+        <div class="volume-list">
+          <div
+            v-for="(vol, vi) in outline.volumes"
+            :key="vi"
+            class="volume-block"
+          >
+            <div
+              class="volume-header"
+              :class="{ expanded: expandedVolumes.includes(vi) }"
+              @click="toggleVolume(vi)"
+            >
+              <span class="volume-num">第{{ vol.volume_number || vi + 1 }}卷</span>
+              <span class="volume-title">{{ vol.title }}</span>
+              <span class="volume-meta">
+                <el-tag size="small" v-if="vol.word_target">{{ (vol.word_target / 10000).toFixed(1) }}万字</el-tag>
+                <el-tag size="small" type="info" v-if="vol.key_arc">{{ vol.key_arc }}</el-tag>
+              </span>
+              <el-icon class="expand-icon"><ArrowDown v-if="!expandedVolumes.includes(vi)" /><ArrowUp v-else /></el-icon>
+            </div>
+            <div v-if="expandedVolumes.includes(vi)" class="volume-detail">
+              <div class="volume-desc" v-if="vol.description">{{ vol.description }}</div>
             </div>
           </div>
-
-          <el-empty v-else description="暂无大纲">
-            <el-button type="primary" :loading="generating" @click="handleGenerate">
-              生成大纲
-            </el-button>
-          </el-empty>
         </div>
       </div>
-
-      <!-- 节点编辑 -->
-      <div class="outline-right">
-        <div class="section-card">
-          <div class="section-title">{{ selectedNode ? '编辑节点' : '选择节点进行编辑' }}</div>
-
-          <div v-if="selectedNode" class="node-editor">
-            <el-form label-position="top" size="large">
-              <el-form-item label="标题">
-                <el-input v-model="selectedNode.label" />
-              </el-form-item>
-              <el-form-item label="内容摘要">
-                <el-input
-                  v-model="selectedNode.summary"
-                  type="textarea"
-                  :rows="4"
-                  placeholder="描述这一部分的主要内容..."
-                />
-              </el-form-item>
-              <el-form-item label="类型">
-                <el-tag>{{ nodeTypeLabel }}</el-tag>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" class="save-btn" @click="saveNode">保存修改</el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <el-empty v-else description="从左侧选择一个节点" />
-        </div>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { generateOutline, getOutline, startWriting } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -114,90 +129,22 @@ const novelId = route.params.id
 
 const outline = ref(null)
 const generating = ref(false)
-const selectedNode = ref(null)
+const expandedVolumes = ref([])
 
-const treeData = computed(() => {
-  if (!outline.value) return []
-  const data = outline.value
-  if (data.volumes) {
-    return data.volumes.map((vol, vi) => ({
-      id: `vol-${vi}`,
-      label: vol.title || `第${vi + 1}卷`,
-      summary: vol.summary || '',
-      type: 'volume',
-      children: (vol.chapters || []).map((ch, ci) => ({
-        id: `ch-${vi}-${ci}`,
-        label: ch.title || `第${ci + 1}章`,
-        summary: ch.summary || '',
-        type: 'chapter'
-      }))
-    }))
+const toggleVolume = (vi) => {
+  const idx = expandedVolumes.value.indexOf(vi)
+  if (idx === -1) {
+    expandedVolumes.value.push(vi)
+  } else {
+    expandedVolumes.value.splice(idx, 1)
   }
-  return [{
-    id: 'root',
-    label: data.title || '总纲',
-    summary: data.summary || '',
-    type: 'outline',
-    children: []
-  }]
-})
-
-const nodeTypeLabel = computed(() => {
-  if (!selectedNode.value) return ''
-  const map = { outline: '总纲', volume: '分卷', chapter: '章节' }
-  return map[selectedNode.value.type] || '节点'
-})
-
-const selectNode = (data) => {
-  selectedNode.value = { ...data }
 }
 
-const addNode = (parent) => {
-  ElMessageBox.prompt('请输入标题', '添加节点', {
-    confirmButtonText: '添加',
-    cancelButtonText: '取消',
-    inputPlaceholder: '节点标题'
-  }).then(({ value }) => {
-    if (!value) return
-    if (!parent) {
-      if (outline.value && outline.value.volumes) {
-        outline.value.volumes.push({ title: value, summary: '', chapters: [] })
-      }
-    } else if (parent.type === 'volume') {
-      const vi = treeData.value.findIndex(n => n.id === parent.id)
-      if (vi !== -1 && outline.value.volumes[vi]) {
-        outline.value.volumes[vi].chapters.push({ title: value, summary: '' })
-      }
-    }
-    ElMessage.success('已添加')
-  }).catch(() => {})
-}
-
-const removeNode = (data) => {
-  ElMessageBox.confirm('确定删除此节点？', '确认', { type: 'warning' }).then(() => {
-    if (data.type === 'volume') {
-      const vi = treeData.value.findIndex(n => n.id === data.id)
-      if (vi !== -1) outline.value.volumes.splice(vi, 1)
-    }
-    if (selectedNode.value?.id === data.id) selectedNode.value = null
-    ElMessage.success('已删除')
-  }).catch(() => {})
-}
-
-const saveNode = () => {
-  if (!selectedNode.value) return
-  const findAndUpdate = (nodes, id, updates) => {
-    for (const node of nodes) {
-      if (node.id === id) { Object.assign(node, updates); return true }
-      if (node.children && findAndUpdate(node.children, id, updates)) return true
-    }
-    return false
-  }
-  findAndUpdate(treeData.value, selectedNode.value.id, {
-    label: selectedNode.value.label,
-    summary: selectedNode.value.summary
-  })
-  ElMessage.success('已保存')
+const formatText = (text) => {
+  if (!text) return ''
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>')
 }
 
 const handleGenerate = async () => {
@@ -205,10 +152,7 @@ const handleGenerate = async () => {
   try {
     await generateOutline(novelId)
     ElMessage.success('大纲生成完成！')
-    try {
-      const fetched = await getOutline(novelId)
-      if (fetched) outline.value = fetched
-    } catch {}
+    await loadOutline()
   } catch (e) {
     ElMessage.error('生成失败: ' + (e.message || '未知错误'))
   } finally {
@@ -232,48 +176,24 @@ const loadOutline = async () => {
     const res = await getOutline(novelId)
     if (!res) return
 
-    // API 返回 { novel_id, outlines: [{level, content, ...}] }
-    // 需要从中提取并转换为 { volumes: [...] } 格式
-    const outlines = res.outlines || res
-    if (Array.isArray(outlines)) {
-      // 找到 master 层级的总纲
+    const outlines = res.outlines || []
+    if (Array.isArray(outlines) && outlines.length > 0) {
       const master = outlines.find(o => o.level === 'master')
       if (master && master.content) {
         let parsed = master.content
-        // content 可能是 JSON 字符串
         if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed)
-          } catch {}
+          try { parsed = JSON.parse(parsed) } catch {}
         }
-        if (parsed && parsed.volumes) {
+        if (parsed) {
           outline.value = parsed
           return
         }
       }
-      // 尝试从 volume 层级组装
-      const volumeOutlines = outlines.filter(o => o.level === 'volume')
-      if (volumeOutlines.length > 0) {
-        const volumes = volumeOutlines.map(vo => {
-          let content = vo.content
-          if (typeof content === 'string') {
-            try { content = JSON.parse(content) } catch {}
-          }
-          return {
-            title: vo.title || `第${vo.volume_number}卷`,
-            summary: content?.volume_title || '',
-            chapters: (content?.chapter_outlines || []).map(ch => ({
-              title: ch.title || `第${ch.chapter_number}章`,
-              summary: ch.summary || '',
-            }))
-          }
-        })
-        outline.value = { volumes }
-        return
-      }
     }
-    // fallback: 直接赋值
-    outline.value = res
+    // fallback
+    if (res.volumes) {
+      outline.value = res
+    }
   } catch {}
 }
 
@@ -290,24 +210,51 @@ onMounted(loadOutline)
   display: inline;
 }
 
-.outline-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* 概览网格 */
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
+@media (min-width: 769px) {
+  .overview-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .btn-text { display: inline; }
+}
+
+@media (max-width: 768px) {
+  .btn-text { display: none; }
+}
+
+.overview-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.card-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.card-value {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* 通用卡片 */
 .section-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .section-title {
@@ -317,52 +264,105 @@ onMounted(loadOutline)
   margin-bottom: 12px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
 .section-header .section-title {
   margin-bottom: 0;
 }
 
-.tree-container {
-  max-height: 60vh;
-  overflow-y: auto;
+.section-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 
-.tree-volume {
-  margin-bottom: 4px;
+/* 主角 */
+.character-grid {
+  display: grid;
+  gap: 12px;
 }
 
-.tree-node {
+.char-item {
   display: flex;
-  justify-content: space-between;
+  gap: 12px;
+}
+
+.char-label {
+  flex-shrink: 0;
+  width: 40px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.char-value {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* 双列 */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 769px) {
+  .two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* 卷列表 */
+.volume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.volume-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.volume-header {
+  display: flex;
   align-items: center;
-  padding: 10px 12px;
-  border-radius: 6px;
+  gap: 10px;
+  padding: 12px 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s;
   -webkit-tap-highlight-color: transparent;
 }
 
-.tree-node:active {
+.volume-header:hover {
   background: var(--bg-hover);
 }
 
-.tree-node.active {
+.volume-header:active {
   background: var(--bg-hover);
-  border-left: 3px solid var(--accent);
 }
 
-.volume-node {
-  font-weight: 600;
+.volume-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.volume-title {
   font-size: 14px;
+  font-weight: 500;
   color: var(--text-primary);
-}
-
-.chapter-node {
-  padding-left: 28px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.node-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -370,55 +370,27 @@ onMounted(loadOutline)
   white-space: nowrap;
 }
 
-.node-actions {
+.volume-meta {
+  display: flex;
+  gap: 6px;
   flex-shrink: 0;
-  opacity: 0.6;
 }
 
-.tree-node:hover .node-actions {
-  opacity: 1;
+.expand-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-size: 14px;
 }
 
-.node-editor .save-btn {
-  width: 100%;
+.volume-detail {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--border);
 }
 
-/* 桌面端 */
-@media (min-width: 769px) {
-  .outline-layout {
-    flex-direction: row;
-  }
-
-  .outline-left {
-    width: 40%;
-    flex-shrink: 0;
-  }
-
-  .outline-right {
-    flex: 1;
-  }
-
-  .btn-text {
-    display: inline;
-  }
-
-  .tree-node:hover {
-    background: var(--bg-hover);
-  }
-
-  .node-actions {
-    opacity: 0;
-  }
-
-  .tree-node:hover .node-actions {
-    opacity: 1;
-  }
-}
-
-/* 手机端 */
-@media (max-width: 768px) {
-  .btn-text {
-    display: none;
-  }
+.volume-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding-top: 10px;
 }
 </style>
