@@ -24,5 +24,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
 )
 
-# 自动发现任务
-celery_app.autodiscover_tasks(["backend.tasks"])
+# 导入任务模块
+import backend.tasks.analyze_task  # noqa
+import backend.tasks.write_task  # noqa
+import backend.tasks.publish_task  # noqa

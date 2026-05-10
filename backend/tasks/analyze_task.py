@@ -47,16 +47,23 @@ def analyze_novel_task(self, novel_id: int, text: str):
 
         # Step 4: 生成风格指南
         self.update_state(state="PROGRESS", meta={"step": "生成风格指南..."})
-        style_guide_text = generate_style_guide(style_dna, hook_analysis, local_stats)
+        style_guide_text = generate_style_guide(style_dna, hook_analysis)
 
         # Step 5: 保存到数据库
         profile = StyleProfile(
             novel_id=novel_id,
-            local_stats=json.dumps(local_stats, ensure_ascii=False),
-            style_dna=json.dumps(style_dna, ensure_ascii=False),
-            hook_analysis=json.dumps(hook_analysis, ensure_ascii=False),
-            style_guide=style_guide_text,
-            text_length=len(text),
+            sentence_analysis=style_dna.get("sentence_analysis"),
+            vocabulary_analysis=style_dna.get("vocabulary_analysis"),
+            rhythm_analysis=style_dna.get("rhythm_analysis"),
+            description_analysis=style_dna.get("description_analysis"),
+            dialogue_analysis=style_dna.get("dialogue_analysis"),
+            tone_analysis=style_dna.get("tone_analysis"),
+            hook_analysis=hook_analysis.get("hooks"),
+            hook_distribution=hook_analysis.get("distribution"),
+            hook_templates=hook_analysis.get("hook_templates"),
+            style_summary=style_dna.get("style_summary", ""),
+            raw_analysis={"style_dna": style_dna, "hook_analysis": hook_analysis, "local_stats": local_stats},
+            status="completed",
         )
         db.add(profile)
 

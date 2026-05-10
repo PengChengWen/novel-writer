@@ -170,10 +170,10 @@ async def trigger_analysis(novel_id: int, db: Session = Depends(get_db)):
         profile.status = "analyzing"
         db.commit()
 
-    # 提交异步任务
+    # 提交异步任务（传入参考文本）
     from backend.tasks.analyze_task import analyze_novel_task
 
-    task = analyze_novel_task.delay(novel_id)
+    task = analyze_novel_task.delay(novel_id, novel.reference_text)
 
     return {
         "message": "风格分析已提交",

@@ -1,16 +1,12 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// 创建 Axios 实例
 const api = axios.create({
   baseURL: '/api',
-  timeout: 120000, // 2分钟超时，AI 生成可能较慢
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  timeout: 300000, // 5分钟，AI生成较慢
+  headers: { 'Content-Type': 'application/json' }
 })
 
-// 响应拦截器：统一错误处理
 api.interceptors.response.use(
   response => response.data,
   error => {
@@ -22,21 +18,16 @@ api.interceptors.response.use(
 
 // ========== 小说管理 ==========
 
-// 获取所有小说项目（从后端获取）
 export async function getNovels() {
   try {
     const res = await api.get('/analyzer/novels')
-    // 同步到 localStorage 作为缓存
     localStorage.setItem('novels', JSON.stringify(res))
     return res
   } catch {
-    // 后端不可用时回退到 localStorage
-    const novels = JSON.parse(localStorage.getItem('novels') || '[]')
-    return novels
+    return JSON.parse(localStorage.getItem('novels') || '[]')
   }
 }
 
-// 创建新小说（写入后端数据库）
 export async function createNovel(data) {
   const formData = new FormData()
   formData.append('title', data.title)
@@ -49,34 +40,29 @@ export async function createNovel(data) {
   })
 
   const novel = {
-    id: res.novel_id,  // 使用后端返回的 MySQL ID
+    id: res.novel_id,
     ...data,
     currentWords: 0,
     status: 'created',
     createdAt: new Date().toISOString()
   }
 
-  // 同步保存到 localStorage
   const novels = JSON.parse(localStorage.getItem('novels') || '[]')
   novels.push(novel)
   localStorage.setItem('novels', JSON.stringify(novels))
-
   return novel
 }
 
-// 获取单个小说
 export async function getNovel(id) {
   try {
-    const res = await api.get(`/analyzer/novel/${id}`)
-    return res
+    return await api.get(`/analyzer/novel/${id}`)
   } catch {
     const novels = JSON.parse(localStorage.getItem('novels') || '[]')
     const novel = novels.find(n => String(n.id) === String(id))
-    return novel ? novel : Promise.reject(new Error('小说不存在'))
+    return novel || Promise.reject(new Error('小说不存在'))
   }
 }
 
-// 更新小说信息
 export function updateNovel(id, data) {
   const novels = JSON.parse(localStorage.getItem('novels') || '[]')
   const idx = novels.findIndex(n => String(n.id) === String(id))
@@ -88,7 +74,6 @@ export function updateNovel(id, data) {
 
 // ========== 风格分析 ==========
 
-// 上传参考文本（向已有小说上传文本）
 export function uploadReferenceText(novelId, text) {
   const formData = new FormData()
   formData.append('text', text)
@@ -97,70 +82,100 @@ export function uploadReferenceText(novelId, text) {
   })
 }
 
-// 触发风格分析
 export function analyzeStyle(novelId) {
   return api.post(`/analyzer/analyze/${novelId}`)
 }
 
-// 获取分析结果
 export function getAnalysisResult(novelId) {
   return api.get(`/analyzer/result/${novelId}`)
 }
 
-// 获取风格指南
-export function getStyleGuide(novelId) {
-  return api.get(`/analyzer/style-guide/${novelId}`)
+// 风格指南包含在分析结果中
+export async function getStyleGuide(novelId) {
+  const res = await api.get(`/analyzer/result/${novelId}`)
+  return { items: [], style_guide: res.style_guide || res.profile?.style_summary || '' }
 }
 
 // ========== 大纲 ==========
 
-// 生成大纲
 export function generateOutline(novelId) {
-  return api.post(`/planner/generate/${novelId}`)
+  return api.post('/planner/generate-master', { novel_id: Number(novelId) })
 }
 
-// 获取大纲
-export function getOutline(novelId) {
-  return api.get(`/planner/outline/${novelId}`)
+export async function getOutline(novelId) {
+  try {
+    const res = await api.get(`/planner/list/${novelId}`)
+    // 返回大纲数据，兼容前端期望的格式
+    if (res && res.length > 0) {
+      return res[0] // 返回第一个大纲
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
-// 编辑大纲
 export function updateOutline(outlineId, data) {
-  return api.put(`/planner/outline/${outlineId}`, data)
+  // 暂无编辑大纲的后端接口
+  return Promise.resolve(data)
 }
 
 // ========== 写作 ==========
 
-// 开始写作
-export function startWriting(novelId) {
-  return api.post(`/writer/start/${novelId}`)
+export async function startWriting(novelId) {
+  // 先获取大纲，找到第一章
+  const chapters = await api.get(`/writer/chapters/${novelId}`)
+  const nextChapter = (chapters.chapters?.length || 0) + 1
+  return api.post('/writer/write-chapter-async', {
+    novel_id: Number(novelId),
+    chapter_number: nextChapter,
+    volume_number: 1
+  })
 }
 
-// 获取章节列表
 export function getChapters(novelId) {
-  return api.get(`/writer/chapters/${novelId}`)
+  return api.get(`/writer/chapters/${novelId}`).then(res => res.chapters || [])
 }
 
-// 获取单章内容
 export function getChapter(chapterId) {
-  return api.get(`/writer/chapter/${chapterId}`)
+  return api.get(`/writer/chapter/${chapterId}`).then(res => res.chapter || res)
 }
 
-// 获取写作状态
-export function getWritingStatus(novelId) {
-  return api.get(`/writer/status/${novelId}`)
+export async function getWritingStatus(novelId) {
+  try {
+    const res = await api.get(`/writer/chapters/${novelId}`)
+    const chapters = res.chapters || []
+    const writing = chapters.some(c => c.status === 'writing')
+    return { status: writing ? 'writing' : 'idle', chapters }
+  } catch {
+    return { status: 'idle', chapters: [] }
+  }
 }
 
 // ========== 发布 ==========
 
-// 发布到番茄小说
 export function publishNovel(novelId) {
-  return api.post(`/publisher/publish/${novelId}`)
+  return api.post('/publisher/publish-batch', {
+    novel_id: Number(novelId),
+    platform: 'fanqie'
+  })
 }
 
-// 获取发布状态
-export function getPublishStatus(novelId) {
-  return api.get(`/publisher/status/${novelId}`)
+export async function getPublishStatus(novelId) {
+  try {
+    const res = await api.get(`/publisher/publish-logs/${novelId}`)
+    return {
+      logged_in: true,
+      history: (res || []).map(log => ({
+        success: log.status === 'success',
+        message: `章节 ${log.chapter_id || ''} - ${log.status}`,
+        detail: log.error_message || '',
+        time: log.published_at || ''
+      }))
+    }
+  } catch {
+    return { logged_in: false, history: [] }
+  }
 }
 
 export default api
