@@ -105,9 +105,12 @@ export function generateOutline(novelId) {
 export async function getOutline(novelId) {
   try {
     const res = await api.get(`/planner/list/${novelId}`)
-    // 返回大纲数据，兼容前端期望的格式
-    if (res && res.length > 0) {
-      return res[0] // 返回第一个大纲
+    // API 返回 { novel_id, outlines: [...] }
+    if (res && res.outlines && res.outlines.length > 0) {
+      return res
+    }
+    if (Array.isArray(res) && res.length > 0) {
+      return res[0]
     }
     return null
   } catch {
